@@ -120,6 +120,7 @@ missing_values <- gather(missing_values, key="feature", value="missing_pct")
 good_features <- filter(missing_values, missing_pct<0.75)
 ```
 
+Create indictor variable to tell if posting is empty lot (1), or a building (0)
 ```{r}
 all_data <- all_data %>% mutate(is_lot = (if_else((num_bathroom == 0  & num_bedroom == 0 & area_lot > 0),1,0)))
 
