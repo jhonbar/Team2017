@@ -111,6 +111,12 @@ test <- all_data[-tr_indices, ]
 
 ```
 
+Create indictor variable to tell if posting is empty lot (1), or a building (0)
+```{r}
+all_data <- all_data %>% mutate(is_lot = (if_else((num_bathroom == 0  & num_bedroom== 0 & area_lot > 0),1,0)))
+
+```
+
 Remove all the properties where we have at most 75% of values missing
 ```{r}
 missing_values <- all_data %>% summarize_each(funs(sum(is.na(.))/n()))
@@ -120,13 +126,9 @@ missing_values <- gather(missing_values, key="feature", value="missing_pct")
 good_features <- filter(missing_values, missing_pct<0.75)
 ```
 
-Create indictor variable to tell if posting is empty lot (1), or a building (0)
-```{r}
-all_data <- all_data %>% mutate(is_lot = (if_else((num_bathroom == 0  & num_bedroom == 0 & area_lot > 0),1,0)))
 
-```
 
 Build a multivariate linear regression
 ```{r}
-regr <- lm(logerror ~ (num_bathroom + ), data = train)
+regr <- lm(logerror ~ (num_bathroom + is_lot), data = train)
 ```
