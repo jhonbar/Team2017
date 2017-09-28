@@ -121,7 +121,7 @@ good_features <- filter(missing_values, missing_pct<0.75)
 ```
 
 ```{r}
-all_data <- all_data %>% mutate(is_lot = (if_else(("num_bathroom" == 0  & "num_bedroom"== 0 & area_lot > 0),1,0)))
+all_data <- all_data %>% mutate(is_lot = (if_else((num_bathroom == 0  & num_bedroom == 0 & area_lot > 0),1,0)))
 
 ```
 
