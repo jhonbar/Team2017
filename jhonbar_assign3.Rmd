@@ -1,0 +1,354 @@
+---
+title: "assignment3"
+author: "Jessica Honbarger"
+date: "March 9, 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r, warning=FALSE, message=F, eval=T}
+library(tidyverse)
+
+# data from 2011
+hour11 <- read_csv('https://raw.githubusercontent.com/idc9/stor390/master/data/bikes_2011.csv')
+
+# x data from 2012
+hour12_x <- read_csv('https://raw.githubusercontent.com/idc9/stor390/master/data/bikes_12_x.csv')
+```
+In my exploration, I will aim to find ways to model the count of the total number of riders using the bike sharing service by exploring the relationship between the count of riders with several variables such as weather, season, holidays, etc. I choose to begin by doing a basic plot of the data demostrating the count of riders vs the time of day. This graph is shown below in Figure 1. We can already start to see a pattern in the number of riders observed. It appears that the number of riders decreases from midnight until aprroximately 4 am when the ridership starts to grow until 3 pm. It then begins to decrease until midnigh when the cycle repeat itself. We can also see several spikes at various hours, a trend I plan on exporing later. 
+```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=cnt), width=.2, height=0, size=.3) +
+    ggtitle('Figure 1') +
+    labs(x = 'hour', y = 'rental count')
+```
+
+I now wish to look at how the season effect the count of riders. In Figure 2 below, I plot riders vs hour of day again, but here I separate the data out based on season. In this graph we see that seasons 2, 3, and 4 all demonstrate very similar patterns of behavior. However, season 1 (winter) appears to  show a distinctly different pattern. The cycle appears to reach its highs and lows at around the same time as the other seasons, but the maximum values are much lower. This is likely because people are less likely to bike in colder temperatures, and hence counts would be reduced during the winter season.  This leads me to add an indicator variable that tells whether or not a season is winter. I plan on using this variable in my final model due to the fact that whether or not it is season 1 appears to have a large effect on the data.s
+```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=cnt, color = season), width=.2, height=0, size=.3) +
+    ggtitle('Figure 2') +
+    labs(x = 'season', y = 'rental count')+ facet_wrap(~season)
+
+hour11 <- mutate(hour11, isntWinter=season>1)
+hour12_x <- mutate(hour12_x, isntWinter=season>1)
+```
+The total count of riders is composed of the sum of riders in two categories: casual and registered. Because I aim to model the total count of riders, I would like to now explore the relationship between these two subclasses of riders. In Figure 3 I plot the count of registered users vs the time of day, and below that in Figure 4 I plot the casual users vs the time of day. In comparing the two graphs, I see that there are some vital differences in the two types of riders. In registered user count, two spikes of usage occur a day. In causual user count I see that the peak time of useage appears in early afternoon and does not experience any spikes through the day. This is likely due to the fact that registered users are more likely than casual users to use the service to bike to/from work, so the registered user count would experience spikes during the common work commute times. For casual users, they are likely using the service for leisure, and hence would use the bikes more often in the midday time.     
+Because of these differences, I choose to change my apprach from attempting to model the total number of users to now try to model the registered and casual users separately, and summing those two models to find my total count. Due to this, I will now explore the relationship of registered and casual users vs other variables separately rather than just observing the total count.
+
+```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual), width=.2, height=0, size=.3) +
+    ggtitle('Figure 3') +
+    labs(x = 'hour', y = 'registered')
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered), width=.2, height=0, size=.3) +
+    ggtitle('Figure 4') +
+    labs(x = 'hour', y = 'casual')
+
+```
+I now will explore the trends in the data I observed earlier. The first thing I noticed with both types of users is that there is a large decrease in usage from 1 am until 6am. These are logical hours to be less active since they occur in the middle of the night when most people would not need access to a bike. Because of this, I will create an indicator variable that tells whether or not a time is during this "down time". In my model, point that occur during down time will be penalized so that the count can be decreased.     
+I also noticed that there are two sets spikes during the day for registered user, one in the morning and one in the evening. As mentioned before, this is possibly becuase of registered users utilizing the service for their commute to work or school. Because of this, I chose to create additional indicator variables to show if an hours is an pm rush (from 4pm until 7pm) a 7am rush, or an 8am rush. I also grouped all of the rush hours togther in the variable rushhrs so that I could examine all hours as a whole.    
+For the casual users, I noticed that the count experienced its greatest numbers during midday from 10am until about 7pm.As discussed previously, it is possible that the causual users are more likely to be utilizing the bikes for their leisure, and would prefer to use the service suring the day. Becuase of this I chose to create an indicator variable for this as well.     
+Below in Figures 5 and 6 I plot the number of registered and casual users against the time of day while highlighting down time. In Figure 7 I show the count of registered against the time of day while highlighting the rush hours. In Figure 8 I show the casual users throughout the day while highlighting the midday portion of the day.
+
+
+```{r}
+
+hour11 <- hour11 %>% 
+    mutate(down_time=(hr>0 & hr<7))
+
+hour11 <- hour11 %>% 
+    mutate(pmrush=(hr>15&hr<20), sevenrush=(hr==7),eightrush = (hr==8)) %>% 
+    mutate(pmspike=((hr==17)|(hr==18))) %>% 
+    mutate(rushhrs=((hr==7)|(hr==8)|((hr>15)&(hr<20))))
+
+hour11 <- hour11 %>% 
+    mutate(day=(hr>9&hr<20))
+    
+
+
+hour12_x <- hour12_x %>% 
+    mutate(down_time=(hr>0 & hr<7))
+
+hour12_x <- hour12_x %>% 
+    mutate(pmrush=(hr>15&hr<20), sevenrush=(hr==7),eightrush = (hr==8)) %>% 
+    mutate(pmspike=((hr==17)|(hr==18))) %>% 
+    mutate(rushhrs=((hr==7)|(hr==8)|((hr>15)&(hr<20))))
+
+hour12_x <- hour12_x %>% 
+    mutate(day=(hr>9&hr<20))
+
+
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered, color = down_time), width=.2, height=0, size=.3) +
+    ggtitle('Figure 5') +
+    labs(x = 'hour', y = 'registered')
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual, color = down_time), width=.2, height=0, size=.3) +
+    ggtitle('Figure 6') +
+    labs(x = 'hour', y = 'casual')
+
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered, color = rushhrs), width=.2, height=0, size=.3) +
+    ggtitle('Figure 7') +
+    labs(x = 'hour', y = 'registered')
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual, color = day), width=.2, height=0, size=.3) +
+    ggtitle('Figure 8') +
+    labs(x = 'hour', y = 'casual')
+```
+
+I now look at the effect of the normalized feeling temperature on the count of registered and casual users. I plot the count of each type of users against the temperature feel in Figures 9 and 10 below. I see that in both cases there appears to be a positive relationship between the feel of the temperature and the number of users. This shows that people of both types are more likely to use the bike system when the temperature is warmers. It appears as though this relationship may be stronger in the case of the casual users, indicating that temperature should absolutely be a factor when trying to predict the number of causal users in my model. The reason for this is likely because registered users who are using the bikes for purposes such as commuting are more likely to use the service regardless of the temperature. Casual users on the other hand may be swayed on whether to use a bike or not based on if it was warmer outside.
+```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=atemp, y=registered), width=.2, height=0, size=.3) +
+    geom_smooth(aes(x=atemp, y=casual),method = lm)+
+    ggtitle('Figure 9')+
+    labs(x = 'Normalized Temperature Feel', y = 'registered')
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=atemp, y=casual), width=.2, height=0, size=.3) +
+    geom_smooth(aes(x=atemp, y=casual),method = lm)+
+    ggtitle('Figure 10') +
+    labs(x = 'Normalized Temperature Feel', y = 'casual')
+
+```
+Along similar lines as above, I would like to explore how the weather situation (1=best weather, 4=worst weather) afects the number of registered and casual users. In Figures 11 and 12 below I show how the count is affected for each user based on the weather situation. I found that in both types of users, there are more observations the lower the weather situation is. It appears that like temperature, the casual user count appear to be influenced more by the weather situation than the registered users are. Regardless, both types of users appear to have a relationship with weather situation and therefore this variable should be included in the model for both.
+```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=weathersit, y=registered), width=.2, height=0, size=.3) +
+    ggtitle('Figure 11')+
+    labs(x = 'Weather Situation', y = 'registered')
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=weathersit, y=casual), width=.2, height=0, size=.3) +
+    ggtitle('Figure 12') +
+    labs(x = 'Weather Situation', y = 'casual')
+
+```
+Becuase weather and temperature are likely both a factor when a person decided to ride or not, I decided to create an interaction term for them. Becuase weather situation had a negative relationship with rider count, and temperature had a positive relationship, for my new variable I multiplies weather situation inverse by the temeperature. This is so that both terms had a positive relationship, and this term in my model could be weighted such that the higher the term is, the higher the prediction would be.    
+I then plotted this new variable to see how it related to the counts for each type of user. For registered users, we see a slight positive trend, but for causal users we see a slightly stronger linear relationship showing the higher this new interation term of weather and temperature is, the higher the casual users.
+```{r}
+hour11 <- mutate(hour11, weathersitInverse = 1/weathersit)
+hour11 <- mutate(hour11, sitAndTemp = weathersitInverse*atemp)
+
+
+hour12_x <- mutate(hour12_x, weathersitInverse = 1/weathersit)
+hour12_x <- mutate(hour12_x, sitAndTemp = weathersitInverse*atemp)
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=sitAndTemp, y=registered), width=.2, height=0, size=.3) +
+    geom_smooth(aes(x=sitAndTemp, y=casual),method = lm)+
+    ggtitle('Figure 13')+
+    labs(x = 'Temperature Feel * 1/(Weather Situation)', y = 'registered')
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=sitAndTemp, y=casual), width=.2, height=0, size=.3) + 
+    geom_smooth(aes(x=sitAndTemp, y=casual),method = lm)+
+    ggtitle('Figure 14') + 
+    labs(x = 'Temperature Feel * 1/(Weather Situation)', y = 'casual')
+    ```
+The final variable I explore is the relationship that user count has with the binary variable indicating whether a day is a working day or not. To explore this, I plotted the count for each types of users against time of day, and then faceted by whether and observation was made on a working day.I found that for registered users, there are more riders in the middle of the day on nonworking days, and nonworking days do not experience the rush hour peaks seen during working days.This is posiibly because during the working days, registered users are likely use the service to commute to work, and during nonworking days, these registered users will use the service more like a casual user might and use the bikes for leisure during the day. For causual users, we see a large increase in the number of riders during the day when it is a nonworking day. This is possibly becuase when these causal users have the day off, they are more likely to use the bike service for pleasure than a day when they would have to work. The general pattern of rise and fall for the casual users appears to be preserved on both days, but amplified during nonworking days.
+    
+    ```{r}
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual), width=.2, height=0, size=.3) +
+    labs(x = 'hour', y = 'casual') +      
+    ggtitle('Figure 15') + facet_wrap(~workingday) 
+    
+
+hour11 %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered), width=.2, height=0, size=.3) +
+    labs(x = 'Temperature Feel * 1/(Weather Situation)', y = 'casual') +
+    ggtitle('Figure 16') +facet_wrap(~workingday)
+    ```
+```{r}
+n <- dim(hour11)[1]
+
+# number of observations that go in the training st
+n_tr <- floor(n * .8)
+
+
+# randomly select n_tr numbers, without replacement, from 1...n
+set.seed(42)
+tr_indices <- sample(x=1:n, size=n_tr, replace=FALSE)
+
+# break the data into a non-overlapping train and test set
+train <- hour11[tr_indices, ]
+test <- hour11[-tr_indices, ]
+```
+
+##Registered Predictor   
+
+I choose to compare two models for my registered predictor. The first model was based on a sine curve of the hour of the day that was altererd so that its peak occurred when I beleive the peak registered use was. I chose to multiply this term by whether or not it was a working day due to the fact there is a sine trend on both types of days, but the curve was slightly different depending on whether it was a working day or not. I also included the various rush hours in my model, and also multiplied them by whether or not the day was a working day. This is due to the fact that when there is not a working da, we should not include these spikes. I also chose to include whether there is down time or not, and if it is winter. All of my terms I included are interacting with my weather situation and temperature term, due to the fact that this factor seems to scale the graph and increase the number of users as it grows. My second model is identical expect I have subsituted the sine curve for a quadratic curve shifted to fit the shape of the graph. In this case, the MSE from the test data was better for the quadratic regression.
+```{r, eval=F}
+
+sin_reg_reg <- lm(registered ~ (I(abs(sin(pi*hr/24 - pi/6)))*workingday + 
+                  I(abs(sin(pi*hr/24 - pi/6)))*workingday + 
+                  workingday * pmrush + workingday*sevenrush + workingday*pmspike + 
+                  workingday*eightrush + down_time*isntWinter)*sitAndTemp,data=train)
+
+
+
+sin_reg_pred_11<- predict(sin_reg_reg, newdata = test)
+
+
+test <- mutate(test,sinRegPred=sin_reg_pred_11)
+
+
+test%>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered,color='actual'), width=.2, height=0, size=.3) +
+    geom_jitter(aes(x=hr, y=sinRegPred, color= 'sine predicted'), width=.2, height=0, size=.3) +
+    ggtitle('Figure 17')
+
+
+
+
+
+summary(sin_reg_reg)$r.squared
+
+
+test <- test %>% 
+    mutate(sinRegResidSqr = (registered- sinRegPred)^2)
+
+print("Mean residual squared:")
+mean(test$sinRegResidSqr)
+```
+
+```{r}
+quad_reg_reg <- lm(registered ~ ( I(((hr-17)^2))*I(!workingday) + 
+                  I(((hr-15)^2))*workingday + 
+                  workingday * pmrush + workingday*sevenrush + workingday*pmspike + 
+                  workingday*eightrush + down_time*isntWinter)*sitAndTemp,data=train)
+
+
+
+
+quad_reg_pred_11<- predict(quad_reg_reg, newdata = test)
+
+
+test <- mutate(test,quadRegPred=quad_reg_pred_11)
+
+# add predictions to 2012 data frame
+test %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=registered,color='actual'), width=.2, height=0, size=.3) +
+    geom_jitter(aes(x=hr, y=quadRegPred, color= 'quadratic predicted'), width=.2, height=0, size=.3) +
+    ggtitle('Figure 18')
+
+
+
+
+
+summary(quad_reg_reg)$r.squared
+
+
+test <- test %>% 
+    mutate(quadRegResidSqr = (registered- quadRegPred)^2)
+
+print("Mean residual squared:")
+mean(test$quadRegResidSqr)
+```
+
+##Casual Predictor
+For my predictor of casual weather, I chose to also base my prediction on a sine curve of the hours. I also chose to include the variables down time and my winter indicator like in registered, but have left off the rush hour variables. Instead I have added the day variable due to the fact there  is an increase in usage during the daylight hours of the day. I also used working day as an interaction term for many of my variables, due to the fact there is a dramatic increase in usage when there is not a working day. All of my terms are interacting with my weather and temperature term due because this also seemed to be highly related to casual usage. I repeated this model in a quadratic regression with the peak shifted to the peak usage times. All other variables were left unchanged. The MSE proved to be better in the sine graph for the casual users. 
+
+```{r}
+sin_cas_reg <- lm(casual ~ ( down_time*isntWinter  + day  
+                   + workingday*I(abs(sin(pi*hr/24 - pi/6)))
+                   + I(!workingday)*I(abs(sin(pi*hr/24))) )*sitAndTemp , data=train)
+
+sin_cas_pred_11<- predict(sin_cas_reg, newdata = test)
+
+test <- mutate(test,sinCasPred=sin_cas_pred_11)
+
+test %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual,color='actual'), width=.2, height=0, size=.3) +
+    geom_jitter(aes(x=hr, y=sinCasPred, color= 'sine predicted'), width=.2, height=0, size=.3) +
+    ggtitle('Figure 19')
+
+summary(sin_cas_reg)$r.squared
+
+test <- test %>% 
+    mutate(sinCasResidSqr = (casual- sinCasPred)^2)
+
+print("Mean residual squared:")
+mean(test$sinCasResidSqr)
+
+```
+
+
+```{r}
+quad_cas_reg <- lm(casual ~ ( down_time*isntWinter  + day  
+                   + workingday*I((hr-17)^2)
+                   + I(!workingday)*I((hr-15)^2 ))*sitAndTemp , data=train)
+
+quad_cas_pred_11<- predict(quad_cas_reg, newdata = test)
+
+test <- mutate(test,quadCasPred=quad_cas_pred_11)
+
+test %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=casual,color='actual'), width=.2, height=0, size=.3) +
+    geom_jitter(aes(x=hr, y=quadCasPred, color= 'quadratic predicted'), width=.2, height=0, size=.3) +
+    ggtitle('Figure 20')
+
+summary(quad_cas_reg)$r.squared
+
+test <- test %>% 
+    mutate(quadCasResidSqr = (quadCasPred - casual)^2)
+
+print("Mean residual squared:")
+mean(test$quadCasResidSqr)
+
+```
+##Predicting 2012
+```{r}
+# get predictions for 2012 data
+pred_12 <- predict(quad_reg_reg, newdata = hour12_x)
+
+# add predictions to 2012 data frame
+hour12_x <- hour12_x %>% 
+            mutate(registered_pred=pred_12)
+
+
+pred_12 <- predict(sin_cas_reg, newdata = hour12_x)
+
+# add predictions to 2012 data frame
+hour12_x <- hour12_x %>% 
+            mutate(casual_pred=pred_12)
+hour12_x <- mutate(hour12_x, cnt_pred = registered_pred + casual_pred)
+
+# save the predictions
+write_csv(hour12_x, 'bike_predictions_2012_jhonbar.csv')
+```
+
+```{r}
+hour12_x %>% 
+    ggplot() +
+    geom_jitter(aes(x=hr, y=cnt_pred), width=.2, height=0, size=.3) +
+    ggtitle('Figure 1') +
+    labs(x = 'hour', y = 'rental count')
+```
