@@ -1,0 +1,102 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(plyr)
+library(tidyverse)
+library(tidyr)
+library(readr)
+library(lsr)
+library(caret)
+library(e1071)
+library(gbm)
+
+all_data <- read_csv('train.csv')
+
+
+
+
+```
+
+
+```{r divide into train and test}
+
+n <- dim(all_data)[1]
+
+# number of observations that go in the training set
+n_tr <- floor(n * .8)
+
+
+# randomly select n_tr numbers, without replacement, from 1...n
+set.seed(42)
+tr_indices <- sample(x=1:n, size=n_tr, replace=FALSE)
+
+# break the data into a non-overlapping train and test set
+train <- all_data[tr_indices, ]
+test <- all_data[-tr_indices, ]
+
+```
+
+```{r}
+tester=gbm(target ~ . ,train[,2:59], distribution = "gaussian",n.trees = 10000, shrinkage = 0.01, interaction.depth = 4)
+n.trees = seq(from=100 ,to=10000, by=100) #no of trees-a vector of 100 values 
+predmatrix<-predict(tester,test[,2:59], n.trees = n.trees)
+test.error<-with(test[,2:59],apply( (predmatrix-target)^2,2,mean))
+plot(n.trees , test.error , pch=19,col="blue",xlab="Number of Trees",ylab="Test Error", main = "Perfomance of Boosting on Test Set")
+
+
+#fitControl <- trainControl(method = "repeatedcv", number = 4, repeats = 4)
+#set.seed(33)
+#gbmFit1 <- train(as.factor(target) ~ ., data = train[,2:59], method = "gbm", trControl = fitControl,verbose = FALSE)
+
+```
+
+
+```{r}
+reg_1 <- lm(target ~ (ps_ind_07_bin + ps_ind_17_bin + ps_reg_02 + ps_car_13 + ps_car_12 + ps_calc_03), data = train)
+pred_1<- predict(reg_1, newdata = test)
+test <- mutate(test,our_preds_1=pred_1)
+test <- test %>% 
+    mutate(ResidSqr = (target - our_preds_1)^2)
+
+
+print("Mean residual squared:")
+mean(test$ResidSqr)
+
+
+test_final <- read_csv ('test.csv')
+predictions <- data.frame(predict(reg_1, test_final))
+write_csv(predictions, 'reg_predictions.csv')
+
+
+```
+
+test_final <- read_csv ('test.csv')
+predictions <- data.frame(predict(reg_1, test_final))
+test_final <- mutate(test_final,pred=predictions)
+write_csv(test_final, 'reg_predictions.csv')
+
+
+```
+
+
+
+
+```{r}
+
+
+y <- data.frame(train[2])
+x <- data.frame (train[3:59])
+
+
+
+
+corrs <- correlate(x, y)
+
+
+
+```
